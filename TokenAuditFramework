@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TokenAuditFramework is Ownable {
+    struct Audit {
+        address auditor;
+        string tokenName;
+        string tokenSymbol;
+        uint256 totalSupply;
+        bool auditPassed;
+    }
+
+    mapping(address => Audit) public audits;
+    mapping(address => bool) public isTokenAudited;
+    address[] public auditedTokens;
+
+    // Events
+    event TokenAudited(address indexed tokenAddress, address indexed auditor, string tokenName, string tokenSymbol, uint256 totalSupply, bool auditPassed);
+
+    // Add a new token audit
+    function addTokenAudit(address tokenAddress, string memory tokenName, string memory tokenSymbol, uint256 totalSupply, bool auditPassed) external onlyOwner {
+        require(!isTokenAudited[tokenAddress], "Token audit already exists");
+
+        audits[tokenAddress] = Audit({
+            auditor: msg.sender,
+            tokenName: tokenName,
+            tokenSymbol: tokenSymbol,
+            totalSupply: totalSupply,
+            auditPassed: auditPassed
+        });
+
+        isTokenAudited[tokenAddress] = true;
+        auditedTokens.push(tokenAddress);
+
+        emit TokenAudited(tokenAddress, msg.sender, tokenName, tokenSymbol, totalSupply, auditPassed);
+    }
+
+    // Get audited token details
+    function getTokenAudit(address tokenAddress) external view returns (address auditor, string memory tokenName, string memory tokenSymbol, uint256 totalSupply, bool auditPassed) {
+        require(isTokenAudited[tokenAddress], "Token audit does not exist");
+
+        Audit memory audit = audits[tokenAddress];
+        return (audit.auditor, audit.tokenName, audit.tokenSymbol, audit.totalSupply, audit.auditPassed);
+    }
+
+    // Get the number of audited tokens
+    function getAuditedTokenCount() external view returns (uint256) {
+        return auditedTokens.length;
+    }
+
+    // Get audited token address by index
+    function getAuditedTokenByIndex(uint256 index) external view returns (address) {
+        require(index < auditedTokens.length, "Invalid index");
+        return auditedTokens[index];
+    }
+
+    // Update audit status of a token
+    function updateAuditStatus(address tokenAddress, bool auditPassed) external onlyOwner {
+        require(isTokenAudited[tokenAddress], "Token audit does not exist");
+
+        audits[tokenAddress].auditPassed = auditPassed;
+
+        emit TokenAudited(tokenAddress, audits[tokenAddress].auditor, audits[tokenAddress].tokenName, audits[tokenAddress].tokenSymbol, audits[tokenAddress].totalSupply, auditPassed);
+    }
+
+    // Remove token audit
+    function removeTokenAudit(address tokenAddress) external onlyOwner {
+        require(isTokenAudited[tokenAddress], "Token audit does not exist");
+
+        delete audits[tokenAddress];
+        isTokenAudited[tokenAddress] = false;
+
+        // Remove from auditedTokens array
+        for (uint256 i = 0; i < auditedTokens.length; i++) {
+            if (auditedTokens[i] == tokenAddress) {
+                auditedTokens[i] = auditedTokens[auditedTokens.length - 1];
+                auditedTokens.pop();
+                break;
+            }
+        }
+    }
+}
